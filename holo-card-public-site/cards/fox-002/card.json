@@ -1,0 +1,12 @@
+{
+  "id": "fox-002",
+  "number": "002",
+  "title": "森のキツネ",
+  "description": "木漏れ日と紅葉に包まれた、森の住人。",
+  "collection": "WOODLAND COLLECTION",
+  "color": "#352519",
+  "effects": [
+    "gold"
+  ],
+  "atlas": "cards/fox-002/atlas.png"
+}
