@@ -1,0 +1,13 @@
+{
+  "id": "owl-003",
+  "number": "003",
+  "title": "月夜のフクロウ",
+  "description": "月の光に浮かぶ、静かな羽音。",
+  "collection": "MOONLIGHT COLLECTION",
+  "color": "#17273f",
+  "effects": [
+    "aurora",
+    "stars"
+  ],
+  "atlas": "cards/owl-003/atlas.png"
+}
