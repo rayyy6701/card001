@@ -1,0 +1,14 @@
+{
+  "id": "kitten-004",
+  "number": "004",
+  "title": "桜と子猫",
+  "description": "花びらの中で、春を見つけた子猫。",
+  "collection": "SAKURA COLLECTION",
+  "color": "#392b30",
+  "effects": [
+    "pearl",
+    "stars"
+  ],
+  "subjectScale": 0.86,
+  "atlas": "cards/kitten-004/atlas.png"
+}

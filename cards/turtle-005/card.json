@@ -1,0 +1,14 @@
+{
+  "id": "turtle-005",
+  "number": "005",
+  "title": "珊瑚の海とウミガメ",
+  "description": "透きとおる海を、小さなウミガメと。",
+  "collection": "OCEAN COLLECTION",
+  "color": "#12323d",
+  "effects": [
+    "aurora",
+    "pearl"
+  ],
+  "subjectScale": 0.86,
+  "atlas": "cards/turtle-005/atlas.png"
+}

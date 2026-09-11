@@ -1,0 +1,14 @@
+{
+  "id": "deer-006",
+  "number": "006",
+  "title": "光の森の子鹿",
+  "description": "木漏れ日と小川が導く、秘密の森。",
+  "collection": "ENCHANTED COLLECTION",
+  "color": "#26331c",
+  "effects": [
+    "gold",
+    "stars"
+  ],
+  "subjectScale": 0.8,
+  "atlas": "cards/deer-006/atlas.png"
+}

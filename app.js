@@ -14,7 +14,7 @@ $('animate-light').checked=movingLight;
 const vertex=`attribute vec2 aPosition;varying vec2 vUv;void main(){vUv=aPosition*.5+.5;gl_Position=vec4(aPosition,0.,1.);}`;
 const fragment=`precision mediump float;
 varying vec2 vUv;uniform sampler2D uBackground,uSubject,uForeground;uniform vec2 uView;
-uniform float uFoil,uDepth,uTime,uPearl;uniform vec4 uEffects;
+uniform float uFoil,uDepth,uTime,uPearl,uSubjectScale;uniform vec4 uEffects;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
 vec3 spectrum(float t){return .55+.45*cos(6.283*(t+vec3(0.,.33,.67)));}
@@ -24,13 +24,27 @@ vec4 layer(sampler2D tex,vec2 uv){vec4 c=texture2D(tex,clamp(uv,.002,.998));c.a*
 float stars(vec2 uv){vec2 p=uv*vec2(14.,21.),id=floor(p),f=fract(p)-.5;float seed=hash(id);f-=vec2(hash(id+2.),hash(id+5.))*.35-.175;float cross=exp(-abs(f.x)*95.-abs(f.y)*9.)+exp(-abs(f.x)*9.-abs(f.y)*95.);float pulse=pow(.5+.5*sin(uTime*1.5+seed*31.+uView.x*4.+uView.y*3.),5.);return cross*step(.74,seed)*pulse;}
 float glitter(vec2 uv){vec2 p=uv*vec2(120.,180.),id=floor(p),f=fract(p)-.5;float seed=hash(id);float fleck=1.-smoothstep(.06,.31,length(f));float pulse=pow(.5+.5*sin(seed*50.+uTime*.8+uView.x*9.+uView.y*7.),9.);return fleck*step(.76,seed)*pulse;}
 void main(){vec2 uv=vUv;
- vec2 b=(uv-.5)/1.16+.5+uView*uDepth*.025;
- vec2 s=(uv-.5)/.94+.5-uView*uDepth*.048;
- vec2 f=(uv-.5)/1.08+.5-uView*uDepth*.10;
+ vec2 b=(uv-.5)/1.22+.5+uView*uDepth*.035;
+ vec2 s=(uv-.5)/uSubjectScale+.5-uView*uDepth*.064;
+ // A shallow curved relief adds internal parallax to the animal's plane.
+ vec2 dome=(s-vec2(.5,.48))*vec2(2.3,1.65);
+ float relief=max(0.,1.-dot(dome,dome));
+ s-=uView*uDepth*relief*.013;
+ vec2 f=(uv-.5)/1.13+.5-uView*uDepth*.12;
  vec3 bg=texture2D(uBackground,clamp(b,.002,.998)).rgb;
- vec4 animal=layer(uSubject,s),plants=layer(uForeground,f);
- float shadow=layer(uSubject,s+vec2(.014,.014)).a*(1.-animal.a)*.12;
- vec3 col=mix(bg*(1.-shadow),animal.rgb,animal.a);col=mix(col,plants.rgb,plants.a);
+ vec4 animal=layer(uSubject,s);
+ vec4 leftPlants=layer(uForeground,f+uView*uDepth*.013);
+ vec4 rightPlants=layer(uForeground,f-uView*uDepth*.013);
+ vec4 plants=mix(leftPlants,rightPlants,smoothstep(.35,.65,uv.x));
+ vec2 shadowOffset=vec2(.018,.021)+uView*uDepth*.018;
+ float castShadow=layer(uSubject,s+shadowOffset).a*.5;
+ castShadow+=layer(uSubject,s+shadowOffset+vec2(.007,0.)).a*.25;
+ castShadow+=layer(uSubject,s+shadowOffset-vec2(.007,0.)).a*.25;
+ float shadow=castShadow*(1.-animal.a)*min(uDepth,1.)*.24;
+ vec3 normal=normalize(vec3(dome*.33,1.));
+ vec3 light=normalize(vec3(-.3+uView.x*.5,.4+uView.y*.5,1.));
+ float shading=mix(1.,.89+.13*max(0.,dot(normal,light)),min(uDepth,1.));
+ vec3 col=mix(bg*(1.-shadow),animal.rgb*shading,animal.a);col=mix(col,plants.rgb,plants.a);
  float protect=1.-animal.a*.56;
  float angle=uView.x*.8+uView.y*.45;
  float sweep=pow(.5+.5*sin((uv.x*.8+uv.y*.38+angle)*6.283),12.);
@@ -51,7 +65,7 @@ void main(){vec2 uv=vUv;
 function compile(type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
 function initGL(){try{gl=canvas.getContext('webgl',{alpha:false,antialias:false,powerPreference:'low-power'});if(!gl)throw Error('WebGL unavailable');program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const pos=gl.getAttribLocation(program,'aPosition');gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
  textures=[];['uBackground','uSubject','uForeground'].forEach((name,i)=>{gl.activeTexture(gl.TEXTURE0+i);const texture=gl.createTexture();textures.push(texture);gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.uniform1i(gl.getUniformLocation(program,name),i);});
- for(const name of ['uView','uFoil','uDepth','uTime','uEffects','uPearl'])locations[name]=gl.getUniformLocation(program,name);
+ for(const name of ['uView','uFoil','uDepth','uTime','uEffects','uPearl','uSubjectScale'])locations[name]=gl.getUniformLocation(program,name);
  canvas.width=660;canvas.height=990;gl.viewport(0,0,660,990);ready=true;if(activeLayers)upload(activeLayers);return true;
  }catch(e){console.error(e);ready=false;canvas.style.opacity='0';$('status').textContent='光の描画が使えないため、立体レイヤーで表示しています。ドラッグと奥行き調整は使えます。';return false;}}
 function upload(layers){if(!ready)return;layers.forEach((layer,i)=>{gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,textures[i]);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,layer);});canvas.style.opacity='1';wake();}
@@ -66,11 +80,12 @@ function prepare(item){if(cache.has(item.id))return cache.get(item.id);const pro
 function fallback(layers){$('fallback').replaceChildren(...layers);layers.forEach((layer,i)=>{layer.dataset.layer=String(i);});}
 function updateEffects(){effectButtons.forEach(button=>button.setAttribute('aria-pressed',String(effects.has(button.dataset.effect))));wake();}
 function applyDefaults(){foil=.65;depth=.8;effects.clear();(active?.effects||['rainbow','stars']).forEach(e=>effects.add(e));$('foil').value='65';$('foil-value').value='65%';$('depth').value='80';$('depth-value').value='80%';updateEffects();}
-function updateFace(){$('flip').textContent=flipped?'↻ 表を見る':'↻ 裏を見る';$('face-label').textContent=flipped?'BACK · '+(active?.number||'001'):String(cards.indexOf(active)+1).padStart(2,'0')+' / 03';$('hint').textContent=flipped?'裏面 · ドラッグして傾ける':'ドラッグして、奥行きと光を楽しむ';}
+function updateFace(){$('flip').textContent=flipped?'↻ 表を見る':'↻ 裏を見る';$('face-label').textContent=flipped?'BACK · '+(active?.number||'001'):String(cards.indexOf(active)+1).padStart(2,'0')+' / '+String(cards.length).padStart(2,'0');$('hint').textContent=flipped?'裏面 · ドラッグして傾ける':'ドラッグして、奥行きと光を楽しむ';}
 async function select(item){const token=++selection;$('loading').hidden=false;$('loading').textContent='カードを準備しています…';try{const layers=await prepare(item);if(token!==selection)return;active=item;activeLayers=layers;document.body.style.setProperty('--scene',item.color);for(const id of ['printed-title','back-title','info-title'])$(id).textContent=item.title;for(const id of ['printed-number','back-number','info-number'])$(id).textContent=item.number;$('description').textContent=item.description;$('collection-label').textContent=item.collection;$('back-collection').textContent=item.collection;$('card-collection').textContent=item.collection.split(' ')[0];$('footer-title').textContent=item.title+' · '+item.number;document.title=item.title+' | Holo Card';card.setAttribute('aria-label',item.title+'、番号'+item.number+'。ドラッグまたは矢印キーで傾けられます。');document.querySelectorAll('[data-card]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.card===item.id)));setAuto(false);flipped=false;tx=3;ty=-9;applyDefaults();updateFace();fallback(layers);upload(layers);$('loading').hidden=true;wake();}catch(e){if(token!==selection)return;console.error(e);$('loading').textContent='読み込めませんでした。カードをもう一度選んでください。';}}
 function gallery(){for(const item of cards){const b=document.createElement('button');b.type='button';b.dataset.card=item.id;b.setAttribute('aria-pressed','false');b.setAttribute('aria-label',item.number+' '+item.title);const thumb=document.createElement('span');thumb.className='thumb';const label=document.createElement('span');label.className='label';const number=document.createElement('small');number.textContent=item.number;const title=document.createElement('strong');title.textContent=item.title;label.append(number,title);b.append(thumb,label);b.onclick=()=>select(item);$('gallery').append(b);prepare(item).then(layers=>{const c=document.createElement('canvas');c.width=118;c.height=177;const ctx=c.getContext('2d');layers.forEach(layer=>ctx.drawImage(layer,0,0,118,177));thumb.append(c);}).catch(()=>{thumb.textContent='✧';});}}
 function draw(){if(!activeLayers)return;const vx=Math.sin((y-(flipped?180:0))*Math.PI/180)*1.7,vy=-Math.sin(x*Math.PI/180)*1.7;
- if(!ready){const scales=[1.16,.94,1.08],factors=[-.025,.048,.10];activeLayers.forEach((layer,i)=>{layer.style.transform=`translate(${vx*depth*factors[i]*100}%,${-vy*depth*factors[i]*100}%) scale(${scales[i]})`;});return;}
+ if(!ready){const scales=[1.22,active?.subjectScale??.94,1.13],factors=[-.035,.064,.12];activeLayers.forEach((layer,i)=>{layer.style.transform=`translate(${vx*depth*factors[i]*100}%,${-vy*depth*factors[i]*100}%) scale(${scales[i]})`;});return;}
+ gl.uniform1f(locations.uSubjectScale,active?.subjectScale??.94);
  gl.uniform2f(locations.uView,vx,vy);gl.uniform1f(locations.uFoil,foil);gl.uniform1f(locations.uDepth,depth);gl.uniform1f(locations.uTime,elapsed);gl.uniform4f(locations.uEffects,+effects.has('rainbow'),+effects.has('stars'),+effects.has('gold'),+effects.has('aurora'));gl.uniform1f(locations.uPearl,+effects.has('pearl'));gl.drawArrays(gl.TRIANGLES,0,6);}
 function animate(now){frame=0;const dt=Math.min((now-last)/1000,.05)||.016;last=now;if(movingLight)elapsed+=dt;if(auto){tx=Math.sin(now*.00085)*10;ty=Math.sin(now*.00065)*25;}const ease=reduced.matches?1:1-Math.exp(-dt*10);x+=(tx-x)*ease;y+=(ty-y)*ease;card.style.transform=`rotateX(${x}deg) rotateY(${y}deg)`;if(now-lastDraw>=30){draw();lastDraw=now;}
  if(!document.hidden&&(auto||drag||Math.abs(x-tx)>.01||Math.abs(y-ty)>.01||(movingLight&&ready&&!flipped&&foil>0&&effects.size)))wake();else draw();}
@@ -84,5 +99,8 @@ card.addEventListener('keydown',e=>{const key=e.key.toLowerCase();if(!['arrowlef
 $('auto').onclick=()=>{if(flipped){flipped=false;updateFace();tx=0;ty=0;}setAuto(!auto);};$('flip').onclick=turn;$('reset').onclick=reset;
 effectButtons.forEach(button=>button.onclick=()=>{const effect=button.dataset.effect;if(effects.has(effect))effects.delete(effect);else effects.add(effect);updateEffects();});$('clear-effects').onclick=()=>{effects.clear();updateEffects();};$('foil').oninput=e=>{foil=Number(e.target.value)/100;$('foil-value').value=e.target.value+'%';wake();};$('depth').oninput=e=>{depth=Number(e.target.value)/100;$('depth-value').value=e.target.value+'%';wake();};$('animate-light').onchange=e=>{movingLight=e.target.checked;wake();};
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();ready=false;canvas.style.opacity='0';$('status').textContent='光の描画を一時停止しています。立体レイヤーで表示中です。';wake();});canvas.addEventListener('webglcontextrestored',()=>{if(initGL())$('status').textContent='';});document.addEventListener('visibilitychange',()=>{if(document.hidden&&frame){cancelAnimationFrame(frame);frame=0;}else{last=performance.now();wake();}});
-initGL();fetch('cards.json').then(r=>{if(!r.ok)throw Error('カード一覧を読み込めませんでした');return r.json();}).then(list=>{cards=list;gallery();return select(cards[0]);}).catch(e=>{console.error(e);$('loading').textContent='カード一覧を読み込めませんでした。ページを再読み込みしてください。';});wake();
+window.holoControls={stopAuto:()=>setAuto(false),tilt:(rx,ry)=>{if(drag)return;setAuto(false);tx=rx;ty=(flipped?180:0)+ry;clamp();wake();}};
+function resizeCanvas(){if(!ready)return;const bounds=card.getBoundingClientRect();const width=Math.min(1200,Math.max(660,Math.round(bounds.width*Math.min(devicePixelRatio||1,2))));canvas.width=width;canvas.height=Math.round(width*1.5);gl.viewport(0,0,canvas.width,canvas.height);wake();}
+window.addEventListener('resize',resizeCanvas);
+initGL();fetch('cards.json').then(r=>{if(!r.ok)throw Error('カード一覧を読み込めませんでした');return r.json();}).then(list=>{cards=list;document.querySelector('.collection-count b').textContent=String(cards.length).padStart(2,'0');gallery();return select(cards[0]);}).catch(e=>{console.error(e);$('loading').textContent='カード一覧を読み込めませんでした。ページを再読み込みしてください。';});wake();
 })();
